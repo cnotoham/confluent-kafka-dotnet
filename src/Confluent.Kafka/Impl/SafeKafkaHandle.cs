@@ -284,7 +284,7 @@ namespace Confluent.Kafka.Impl
         {
             var headersPtr = IntPtr.Zero;
 
-            if (headers != null)
+            if (headers != null && headers.Any())
             {
                 headersPtr = Librdkafka.headers_new((IntPtr) headers.Count());
                 if (headersPtr == IntPtr.Zero)
@@ -488,6 +488,123 @@ namespace Confluent.Kafka.Impl
         {
             ThrowIfHandleClosed();
             return Librdkafka.poll_set_consumer(handle);
+        }
+
+        internal void InitTransactions(int millisecondsTimeout)
+        {
+            var error = new Error(Librdkafka.init_transactions(this.handle, (IntPtr)millisecondsTimeout));
+            if (error.Code != ErrorCode.NoError)
+            {
+                if (error.IsRetriable)
+                {
+                    throw new KafkaRetriableException(error);
+                }
+                throw new KafkaException(error);
+            }
+        }
+
+        internal void BeginTransaction()
+        {
+            var error = new Error(Librdkafka.begin_transaction(this.handle));
+            if (error.Code != ErrorCode.NoError)
+            {
+                throw new KafkaException(error);
+            }
+        }
+
+        internal void CommitTransaction(int millisecondsTimeout)
+        {
+            var error = new Error(Librdkafka.commit_transaction(this.handle, (IntPtr)millisecondsTimeout));
+            if (error.Code != ErrorCode.NoError)
+            {
+                if (error.TxnRequiresAbort)
+                {
+                    throw new KafkaTxnRequiresAbortException(error);
+                }
+                if (error.IsRetriable)
+                {
+                    throw new KafkaRetriableException(error);
+                }
+                throw new KafkaException(error);
+            }
+        }
+
+        internal void AbortTransaction(int millisecondsTimeout)
+        {
+            var error = new Error(Librdkafka.abort_transaction(this.handle, (IntPtr)millisecondsTimeout));
+            if (error.Code != ErrorCode.NoError)
+            {
+                if (error.IsRetriable)
+                {
+                    throw new KafkaRetriableException(error);
+                }
+                throw new KafkaException(error);
+            }
+        }
+
+        internal void SendOffsetsToTransaction(IEnumerable<TopicPartitionOffset> offsets, IConsumerGroupMetadata groupMetadata, int millisecondsTimeout)
+        {
+            IntPtr offsetsPtr = GetCTopicPartitionList(offsets);
+
+            if (!(groupMetadata is ConsumerGroupMetadata))
+            {
+                throw new ArgumentException("groupMetadata object must be a value acquired via Consumer.ConsumerGroupMetadata.");
+            }
+            var serializedMetadata = ((ConsumerGroupMetadata)groupMetadata).serializedMetadata;
+            var cgmdPtr = this.DeserializeConsumerGroupMetadata(serializedMetadata);
+            try
+            {
+                var error = new Error(Librdkafka.send_offsets_to_transaction(this.handle, offsetsPtr, cgmdPtr, (IntPtr)millisecondsTimeout));
+                if (error.Code != ErrorCode.NoError)
+                {
+                    if (error.IsRetriable)
+                    {
+                        throw new KafkaRetriableException(error);
+                    }
+                    if (error.TxnRequiresAbort)
+                    {
+                        throw new KafkaTxnRequiresAbortException(error);
+                    }
+                    throw new KafkaException(error);
+                }
+            }
+            finally
+            {
+                this.DestroyConsumerGroupMetadata(cgmdPtr);
+            }
+        }
+
+        internal IntPtr GetConsumerGroupMetadata()
+            => Librdkafka.consumer_group_metadata(this.handle);
+
+        internal void DestroyConsumerGroupMetadata(IntPtr consumerGroupMetadata)
+            => Librdkafka.consumer_group_metadata_destroy(consumerGroupMetadata);
+
+        internal unsafe byte[] SerializeConsumerGroupMetadata(IntPtr consumerGroupMetadata)
+        {
+            var error = new Error(Librdkafka.consumer_group_metadata_write(consumerGroupMetadata, out IntPtr buffer, out IntPtr dataSize));
+            if (error.Code != ErrorCode.NoError)
+            {
+                throw new KafkaException(error);
+            }
+            var result = new byte[(int)dataSize];
+            byte* pIter = (byte*)buffer;
+            for (int i=0; i<(int)dataSize; ++i)
+            {
+                result[i] = *pIter++;
+            }
+            Librdkafka.mem_free(IntPtr.Zero, buffer);
+            return result;
+        }
+
+        internal IntPtr DeserializeConsumerGroupMetadata(byte[] buffer)
+        {
+            var error = new Error(Librdkafka.consumer_group_metadata_read(out IntPtr cgmd, buffer, (IntPtr)buffer.Length));
+            if (error.Code != ErrorCode.NoError)
+            {
+                throw new KafkaException(error);
+            }
+            return cgmd;
         }
 
         internal WatermarkOffsets QueryWatermarkOffsets(string topic, int partition, int millisecondsTimeout)
@@ -992,6 +1109,11 @@ namespace Confluent.Kafka.Impl
 
             foreach (var p in offsets)
             {
+                if (p.Topic == null)
+                {
+                    Librdkafka.topic_partition_list_destroy(list);
+                    throw new ArgumentException("Cannot create offsets list because one or more topics is null.");
+                }
                 IntPtr ptr = Librdkafka.topic_partition_list_add(list, p.Topic, p.Partition);
                 Marshal.WriteInt64(ptr, (int)Util.Marshal.OffsetOf<rd_kafka_topic_partition>("offset"), p.Offset);
             }
@@ -1434,5 +1556,34 @@ namespace Confluent.Kafka.Impl
             Librdkafka.AdminOptions_destroy(optionsPtr);
         }
 
+        internal void OAuthBearerSetToken(string tokenValue, long lifetimeMs, string principalName, IDictionary<string, string> extensions)
+        {
+            if (tokenValue == null) throw new ArgumentNullException(nameof(tokenValue));
+
+            var extensionsArray = extensions.ToStringArray();
+            var errorStringBuilder = new StringBuilder(Librdkafka.MaxErrorStringLength);
+            var errorCode = Librdkafka.oauthbearer_set_token(handle,
+                tokenValue, lifetimeMs, principalName,
+                extensionsArray, (UIntPtr) (extensionsArray?.Length ?? 0),
+                errorStringBuilder, (UIntPtr) errorStringBuilder.Capacity);
+
+            if (errorCode != ErrorCode.NoError)
+            {
+                throw new KafkaException(CreatePossiblyFatalError(errorCode, errorStringBuilder.ToString()));
+            }
+        }
+
+        internal void OAuthBearerSetTokenFailure(string errstr)
+        {
+            if (errstr == null) throw new ArgumentNullException(nameof(errstr));
+            if (string.IsNullOrEmpty(errstr)) throw new ArgumentException($"Argument '{nameof(errstr)}' must be a non-empty string");
+
+            var errorCode = Librdkafka.oauthbearer_set_token_failure(handle, errstr);
+
+            if (errorCode != ErrorCode.NoError)
+            {
+                throw new KafkaException(errorCode);
+            }
+        }
     }
 }

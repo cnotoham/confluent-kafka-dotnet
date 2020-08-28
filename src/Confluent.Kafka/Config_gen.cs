@@ -1,4 +1,4 @@
-// *** Auto-generated from librdkafka v1.3.0 *** - do not modify manually.
+// *** Auto-generated from librdkafka v1.5.0-RC1 *** - do not modify manually.
 //
 // Copyright 2018 Confluent Inc.
 //
@@ -225,7 +225,12 @@ namespace Confluent.Kafka
         /// <summary>
         ///     SCRAM-SHA-512
         /// </summary>
-        ScramSha512
+        ScramSha512,
+
+        /// <summary>
+        ///     OAUTHBEARER
+        /// </summary>
+        OAuthBearer
     }
 
     /// <summary>
@@ -287,6 +292,7 @@ namespace Confluent.Kafka
                 if (r == "PLAIN") { return Confluent.Kafka.SaslMechanism.Plain; }
                 if (r == "SCRAM-SHA-256") { return Confluent.Kafka.SaslMechanism.ScramSha256; }
                 if (r == "SCRAM-SHA-512") { return Confluent.Kafka.SaslMechanism.ScramSha512; }
+                if (r == "OAUTHBEARER") { return Confluent.Kafka.SaslMechanism.OAuthBearer; }
                 throw new ArgumentException($"Unknown sasl.mechanism value {r}");
             }
             set
@@ -296,6 +302,7 @@ namespace Confluent.Kafka
                 else if (value == Confluent.Kafka.SaslMechanism.Plain) { this.properties["sasl.mechanism"] = "PLAIN"; }
                 else if (value == Confluent.Kafka.SaslMechanism.ScramSha256) { this.properties["sasl.mechanism"] = "SCRAM-SHA-256"; }
                 else if (value == Confluent.Kafka.SaslMechanism.ScramSha512) { this.properties["sasl.mechanism"] = "SCRAM-SHA-512"; }
+                else if (value == Confluent.Kafka.SaslMechanism.OAuthBearer) { this.properties["sasl.mechanism"] = "OAUTHBEARER"; }
                 else throw new ArgumentException($"Unknown sasl.mechanism value {value}");
             }
         }
@@ -419,6 +426,14 @@ namespace Confluent.Kafka
         public bool? TopicMetadataRefreshSparse { get { return GetBool("topic.metadata.refresh.sparse"); } set { this.SetObject("topic.metadata.refresh.sparse", value); } }
 
         /// <summary>
+        ///     Apache Kafka topic creation is asynchronous and it takes some time for a new topic to propagate throughout the cluster to all brokers. If a client requests topic metadata after manual topic creation but before the topic has been fully propagated to the broker the client is requesting metadata from, the topic will seem to be non-existent and the client will mark the topic as such, failing queued produced messages with `ERR__UNKNOWN_TOPIC`. This setting delays marking a topic as non-existent until the configured propagation max time has passed. The maximum propagation time is calculated from the time the topic is first referenced in the client, e.g., on produce().
+        ///
+        ///     default: 30000
+        ///     importance: low
+        /// </summary>
+        public int? TopicMetadataPropagationMaxMs { get { return GetInt("topic.metadata.propagation.max.ms"); } set { this.SetObject("topic.metadata.propagation.max.ms", value); } }
+
+        /// <summary>
         ///     Topic blacklist, a comma-separated list of regular expressions for matching topic names that should be ignored in broker metadata information as if the topics did not exist.
         ///
         ///     default: ''
@@ -537,6 +552,14 @@ namespace Confluent.Kafka
         ///     importance: low
         /// </summary>
         public bool? LogThreadName { get { return GetBool("log.thread.name"); } set { this.SetObject("log.thread.name", value); } }
+
+        /// <summary>
+        ///     If enabled librdkafka will initialize the POSIX PRNG with srand(current_time.milliseconds) on the first invocation of rd_kafka_new(). If disabled the application must call srand() prior to calling rd_kafka_new().
+        ///
+        ///     default: true
+        ///     importance: low
+        /// </summary>
+        public bool? EnableRandomSeed { get { return GetBool("enable.random.seed"); } set { this.SetObject("enable.random.seed", value); } }
 
         /// <summary>
         ///     Log broker disconnects. It might be useful to turn this off when interacting with 0.9 brokers with an aggressive `connection.max.idle.ms` value.
@@ -659,7 +682,7 @@ namespace Confluent.Kafka
         public string SslCertificatePem { get { return Get("ssl.certificate.pem"); } set { this.SetObject("ssl.certificate.pem", value); } }
 
         /// <summary>
-        ///     File or directory path to CA certificate(s) for verifying the broker's key.
+        ///     File or directory path to CA certificate(s) for verifying the broker's key. Defaults: On Windows the system's CA certificates are automatically looked up in the Windows Root certificate store. On Mac OSX it is recommended to install openssl using Homebrew, to provide CA certificates. On Linux install the distribution's ca-certificates package. If OpenSSL is statically linked or `ssl.ca.location` is set to `probe` a list of standard paths will be probed and the first one found will be used as the default CA certificate location path. If OpenSSL is dynamically linked the OpenSSL library's default path will be used (see `OPENSSLDIR` in `openssl version -a`).
         ///
         ///     default: ''
         ///     importance: low
@@ -890,7 +913,7 @@ namespace Confluent.Kafka
         public int? RequestTimeoutMs { get { return GetInt("request.timeout.ms"); } set { this.SetObject("request.timeout.ms", value); } }
 
         /// <summary>
-        ///     Local message timeout. This value is only enforced locally and limits the time a produced message waits for successful delivery. A time of 0 is infinite. This is the maximum time librdkafka may use to deliver a message (including retries). Delivery error occurs when either the retry count or the message timeout are exceeded.
+        ///     Local message timeout. This value is only enforced locally and limits the time a produced message waits for successful delivery. A time of 0 is infinite. This is the maximum time librdkafka may use to deliver a message (including retries). Delivery error occurs when either the retry count or the message timeout are exceeded. The message timeout is automatically adjusted to `transaction.timeout.ms` if `transactional.id` is configured.
         ///
         ///     default: 300000
         ///     importance: high
@@ -898,7 +921,7 @@ namespace Confluent.Kafka
         public int? MessageTimeoutMs { get { return GetInt("message.timeout.ms"); } set { this.SetObject("message.timeout.ms", value); } }
 
         /// <summary>
-        ///     Partitioner: `random` - random distribution, `consistent` - CRC32 hash of key (Empty and NULL keys are mapped to single partition), `consistent_random` - CRC32 hash of key (Empty and NULL keys are randomly partitioned), `murmur2` - Java Producer compatible Murmur2 hash of key (NULL keys are mapped to single partition), `murmur2_random` - Java Producer compatible Murmur2 hash of key (NULL keys are randomly partitioned. This is functionally equivalent to the default partitioner in the Java Producer.).
+        ///     Partitioner: `random` - random distribution, `consistent` - CRC32 hash of key (Empty and NULL keys are mapped to single partition), `consistent_random` - CRC32 hash of key (Empty and NULL keys are randomly partitioned), `murmur2` - Java Producer compatible Murmur2 hash of key (NULL keys are mapped to single partition), `murmur2_random` - Java Producer compatible Murmur2 hash of key (NULL keys are randomly partitioned. This is functionally equivalent to the default partitioner in the Java Producer.), `fnv1a` - FNV-1a hash of key (NULL keys are mapped to single partition), `fnv1a_random` - FNV-1a hash of key (NULL keys are randomly partitioned).
         ///
         ///     default: consistent_random
         ///     importance: high
@@ -912,6 +935,22 @@ namespace Confluent.Kafka
         ///     importance: medium
         /// </summary>
         public int? CompressionLevel { get { return GetInt("compression.level"); } set { this.SetObject("compression.level", value); } }
+
+        /// <summary>
+        ///     Enables the transactional producer. The transactional.id is used to identify the same transactional producer instance across process restarts. It allows the producer to guarantee that transactions corresponding to earlier instances of the same producer have been finalized prior to starting any new transactions, and that any zombie instances are fenced off. If no transactional.id is provided, then the producer is limited to idempotent delivery (if enable.idempotence is set). Requires broker version >= 0.11.0.
+        ///
+        ///     default: ''
+        ///     importance: high
+        /// </summary>
+        public string TransactionalId { get { return Get("transactional.id"); } set { this.SetObject("transactional.id", value); } }
+
+        /// <summary>
+        ///     The maximum amount of time in milliseconds that the transaction coordinator will wait for a transaction status update from the producer before proactively aborting the ongoing transaction. If this value is larger than the `transaction.max.timeout.ms` setting in the broker, the init_transactions() call will fail with ERR_INVALID_TRANSACTION_TIMEOUT. The transaction timeout automatically adjusts `message.timeout.ms` and `socket.timeout.ms`, unless explicitly configured in which case they must not exceed the transaction timeout (`socket.timeout.ms` must be at least 100ms lower than `transaction.timeout.ms`). This is also the default timeout value if no timeout (-1) is supplied to the transactional API methods.
+        ///
+        ///     default: 60000
+        ///     importance: medium
+        /// </summary>
+        public int? TransactionTimeoutMs { get { return GetInt("transaction.timeout.ms"); } set { this.SetObject("transaction.timeout.ms", value); } }
 
         /// <summary>
         ///     When set to `true`, the producer will ensure that messages are successfully produced exactly once and in the original produce order. The following configuration properties are adjusted automatically (if not modified by the user) when idempotence is enabled: `max.in.flight.requests.per.connection=5` (must be less than or equal to 5), `retries=INT32_MAX` (must be greater than 0), `acks=all`, `queuing.strategy=fifo`. Producer instantation will fail if user-supplied configuration is incompatible.
@@ -986,12 +1025,20 @@ namespace Confluent.Kafka
         public CompressionType? CompressionType { get { return (CompressionType?)GetEnum(typeof(CompressionType), "compression.type"); } set { this.SetObject("compression.type", value); } }
 
         /// <summary>
-        ///     Maximum number of messages batched in one MessageSet. The total MessageSet size is also limited by message.max.bytes.
+        ///     Maximum number of messages batched in one MessageSet. The total MessageSet size is also limited by batch.size and message.max.bytes.
         ///
         ///     default: 10000
         ///     importance: medium
         /// </summary>
         public int? BatchNumMessages { get { return GetInt("batch.num.messages"); } set { this.SetObject("batch.num.messages", value); } }
+
+        /// <summary>
+        ///     Maximum size (in bytes) of all messages batched in one MessageSet, including protocol framing overhead. This limit is applied after the first message has been added to the batch, regardless of the first message's size, this is to ensure that messages that exceed batch.size are produced. The total MessageSet size is also limited by batch.num.messages and message.max.bytes.
+        ///
+        ///     default: 1000000
+        ///     importance: medium
+        /// </summary>
+        public int? BatchSize { get { return GetInt("batch.size"); } set { this.SetObject("batch.size", value); } }
 
     }
 
@@ -1050,6 +1097,14 @@ namespace Confluent.Kafka
         ///     importance: high
         /// </summary>
         public string GroupId { get { return Get("group.id"); } set { this.SetObject("group.id", value); } }
+
+        /// <summary>
+        ///     Enable static group membership. Static group members are able to leave and rejoin a group within the configured `session.timeout.ms` without prompting a group rebalance. This should be used in combination with a larger `session.timeout.ms` to avoid group rebalances caused by transient unavailability (e.g. process restarts). Requires broker version >= 2.3.0.
+        ///
+        ///     default: ''
+        ///     importance: medium
+        /// </summary>
+        public string GroupInstanceId { get { return Get("group.instance.id"); } set { this.SetObject("group.instance.id", value); } }
 
         /// <summary>
         ///     Name of partition assignment strategy to use when elected group leader assigns partitions to group members.
@@ -1132,17 +1187,17 @@ namespace Confluent.Kafka
         public int? QueuedMinMessages { get { return GetInt("queued.min.messages"); } set { this.SetObject("queued.min.messages", value); } }
 
         /// <summary>
-        ///     Maximum number of kilobytes per topic+partition in the local consumer queue. This value may be overshot by fetch.message.max.bytes. This property has higher priority than queued.min.messages.
+        ///     Maximum number of kilobytes of queued pre-fetched messages in the local consumer queue. If using the high-level consumer this setting applies to the single consumer queue, regardless of the number of partitions. When using the legacy simple consumer or when separate partition queues are used this setting applies per partition. This value may be overshot by fetch.message.max.bytes. This property has higher priority than queued.min.messages.
         ///
-        ///     default: 1048576
+        ///     default: 65536
         ///     importance: medium
         /// </summary>
         public int? QueuedMaxMessagesKbytes { get { return GetInt("queued.max.messages.kbytes"); } set { this.SetObject("queued.max.messages.kbytes", value); } }
 
         /// <summary>
-        ///     Maximum time the broker may wait to fill the response with fetch.min.bytes.
+        ///     Maximum time the broker may wait to fill the Fetch response with fetch.min.bytes of messages.
         ///
-        ///     default: 100
+        ///     default: 500
         ///     importance: low
         /// </summary>
         public int? FetchWaitMaxMs { get { return GetInt("fetch.wait.max.ms"); } set { this.SetObject("fetch.wait.max.ms", value); } }
@@ -1202,6 +1257,14 @@ namespace Confluent.Kafka
         ///     importance: medium
         /// </summary>
         public bool? CheckCrcs { get { return GetBool("check.crcs"); } set { this.SetObject("check.crcs", value); } }
+
+        /// <summary>
+        ///     Allow automatic topic creation on the broker when subscribing to or assigning non-existent topics. The broker must also be configured with `auto.create.topics.enable=true` for this configuraiton to take effect. Note: The default value (false) is different from the Java consumer (true). Requires broker version >= 0.11.0.0, for older broker versions only the broker configuration applies.
+        ///
+        ///     default: false
+        ///     importance: low
+        /// </summary>
+        public bool? AllowAutoCreateTopics { get { return GetBool("allow.auto.create.topics"); } set { this.SetObject("allow.auto.create.topics", value); } }
 
     }
 

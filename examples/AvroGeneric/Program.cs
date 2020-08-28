@@ -20,7 +20,6 @@ using Confluent.Kafka.SyncOverAsync;
 using Confluent.SchemaRegistry.Serdes;
 using Confluent.SchemaRegistry;
 using System;
-using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -77,7 +76,7 @@ namespace Confluent.Kafka.Examples.AvroGeneric
                             {
                                 var consumeResult = consumer.Consume(cts.Token);
 
-                                Console.WriteLine($"Key: {consumeResult.Message.Key}\nValue: {consumeResult.Value}");
+                                Console.WriteLine($"Key: {consumeResult.Message.Key}\nValue: {consumeResult.Message.Value}");
                             }
                             catch (ConsumeException e)
                             {
@@ -111,11 +110,19 @@ namespace Confluent.Kafka.Examples.AvroGeneric
                     record.Add("favorite_number", i++);
                     record.Add("favorite_color", "blue");
 
-                    await producer
-                        .ProduceAsync(topicName, new Message<string, GenericRecord> { Key = text, Value = record })
-                        .ContinueWith(task => task.IsFaulted
-                            ? $"error producing message: {task.Exception.Message}"
-                            : $"produced to: {task.Result.TopicPartitionOffset}");
+                    try
+                    {
+                        var dr = await producer.ProduceAsync(topicName, new Message<string, GenericRecord> { Key = text, Value = record });
+                        Console.WriteLine($"produced to: {dr.TopicPartitionOffset}");
+                    }
+                    catch (ProduceException<string, GenericRecord> ex)
+                    {
+                        // In some cases (notably Schema Registry connectivity issues), the InnerException
+                        // of the ProduceException contains additional informatiom pertaining to the root
+                        // cause of the problem. This information is automatically included in the output
+                        // of the ToString() method of the ProduceException, called implicitly in the below.
+                        Console.WriteLine($"error producing message: {ex}");
+                    }
                 }
             }
 

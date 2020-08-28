@@ -33,22 +33,24 @@ client. Thanks Andreas!
 
 ## Referencing
 
-confluent-kafka-dotnet is distributed via NuGet. We provide three packages:
+confluent-kafka-dotnet is distributed via NuGet. We provide five packages:
 
 - [Confluent.Kafka](https://www.nuget.org/packages/Confluent.Kafka/) *[net45, netstandard1.3, netstandard2.0]* - The core client library.
-- [Confluent.SchemaRegistry.Serdes](https://www.nuget.org/packages/Confluent.SchemaRegistry.Serdes/) *[net452, netstandard2.0]* - Provides a serializer and deserializer for working with Avro serialized data with Confluent Schema Registry integration.
-- [Confluent.SchemaRegistry](https://www.nuget.org/packages/Confluent.SchemaRegistry/) *[net452, netstandard1.4, netstandard2.0]* - Confluent Schema Registry client (a dependency of Confluent.SchemaRegistry.Serdes).
+- [Confluent.SchemaRegistry.Serdes.Avro](https://www.nuget.org/packages/Confluent.SchemaRegistry.Serdes.Avro/) *[netstandard2.0]* - Provides a serializer and deserializer for working with Avro serialized data with Confluent Schema Registry integration.
+- [Confluent.SchemaRegistry.Serdes.Protobuf](https://www.nuget.org/packages/Confluent.SchemaRegistry.Serdes.Protobuf/) *[netstandard2.0]* - Provides a serializer and deserializer for working with Protobuf serialized data with Confluent Schema Registry integration.
+- [Confluent.SchemaRegistry.Serdes.Json](https://www.nuget.org/packages/Confluent.SchemaRegistry.Serdes.Json/) *[netstandard2.0]* - Provides a serializer and deserializer for working with Json serialized data with Confluent Schema Registry integration.
+- [Confluent.SchemaRegistry](https://www.nuget.org/packages/Confluent.SchemaRegistry/) *[netstandard1.4, netstandard2.0]* - Confluent Schema Registry client (a dependency of the Confluent.SchemaRegistry.Serdes packages).
 
 To install Confluent.Kafka from within Visual Studio, search for Confluent.Kafka in the NuGet Package Manager UI, or run the following command in the Package Manager Console:
 
 ```
-Install-Package Confluent.Kafka -Version 1.3.0
+Install-Package Confluent.Kafka -Version 1.5.1
 ```
 
 To add a reference to a dotnet core project, execute the following at the command line:
 
 ```
-dotnet add package -v 1.3.0 Confluent.Kafka
+dotnet add package -v 1.5.1 Confluent.Kafka
 ```
 
 Note: `Confluent.Kafka` depends on the `librdkafka.redist` package which provides a number of different builds of `librdkafka` that are compatible with [common platforms](https://github.com/edenhill/librdkafka/wiki/librdkafka.redist-NuGet-package-runtime-libraries). If you are on one of these platforms this will all work seamlessly (and you don't need to explicitly reference `librdkafka.redist`). If you are on a different platform, you may need to [build librdkafka](https://github.com/edenhill/librdkafka#building) manually (or acquire it via other means) and load it using the [Library.Load](https://docs.confluent.io/current/clients/confluent-kafka-dotnet/api/Confluent.Kafka.Library.html#Confluent_Kafka_Library_Load_System_String_) method.
@@ -198,23 +200,26 @@ class Program
 }
 ```
 
-### Working with Apache Avro
+### Schema Registry Integration
 
-The `Confluent.SchemaRegistry.Serdes` nuget package provides an Avro serializer and deserializer that integrate with [Confluent
-Schema Registry](https://docs.confluent.io/current/schema-registry/docs/index.html). The `Confluent.SchemaRegistry` 
-nuget package provides a client for interfacing with Schema Registry's REST API.
+The three "Serdes" packages provide serializers and deserializers for Avro, Protobuf and JSON with [Confluent Schema Registry](https://docs.confluent.io/current/schema-registry/docs/index.html) integration. The `Confluent.SchemaRegistry` nuget package provides a client for interfacing with
+Schema Registry's REST API.
+
+**Note:** All three serialization formats are supported across Confluent Platform. They each make different tradeoffs, and you should use the one that best matches to your requirements. Avro is well suited to the streaming data use-case, but the maturity of the non-Java implementations lags that of Java - this is an important consideration. Protobuf and JSON both have great support in .NET.
+
+#### Avro
 
 You can use the Avro serializer and deserializer with the `GenericRecord` class or with specific classes generated
 using the `avrogen` tool, available via Nuget (.NET Core 2.1 required):
 
 ```
-dotnet tool install -g Confluent.Apache.Avro.AvroGen
+dotnet tool install --global Apache.Avro.Tools
 ```
 
 Usage:
 
 ```
-avrogen -s your_schema.asvc .
+avrogen -s your_schema.avsc .
 ```
 
 For more information about working with Avro in .NET, refer to the the blog post [Decoupling Systems with Apache Kafka, Schema Registry and Avro](https://www.confluent.io/blog/decoupling-systems-with-apache-kafka-schema-registry-and-avro/)

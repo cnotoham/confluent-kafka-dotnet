@@ -168,6 +168,9 @@ namespace Confluent.Kafka.Impl
             _conf_set_offset_commit_cb = (Action<IntPtr, CommitDelegate>)methods.Single(m => m.Name == "rd_kafka_conf_set_offset_commit_cb").CreateDelegate(typeof(Action<IntPtr, CommitDelegate>));
             _conf_set_log_cb = (Action<IntPtr, LogDelegate>)methods.Single(m => m.Name == "rd_kafka_conf_set_log_cb").CreateDelegate(typeof(Action<IntPtr, LogDelegate>));
             _conf_set_stats_cb = (Action<IntPtr, StatsDelegate>)methods.Single(m => m.Name == "rd_kafka_conf_set_stats_cb").CreateDelegate(typeof(Action<IntPtr, StatsDelegate>));
+            _conf_set_oauthbearer_token_refresh_cb = (Action<IntPtr, OAuthBearerTokenRefreshDelegate>)methods.Single(m => m.Name == "rd_kafka_conf_set_oauthbearer_token_refresh_cb").CreateDelegate(typeof(Action<IntPtr, OAuthBearerTokenRefreshDelegate>));
+            _oauthbearer_set_token = (Func<IntPtr, string, long, string, string[], UIntPtr, StringBuilder, UIntPtr, ErrorCode>)methods.Single(m => m.Name == "rd_kafka_oauthbearer_set_token").CreateDelegate(typeof(Func<IntPtr, string, long, string, string[], UIntPtr, StringBuilder, UIntPtr, ErrorCode>));
+            _oauthbearer_set_token_failure = (Func<IntPtr, string, ErrorCode>)methods.Single(m => m.Name == "rd_kafka_oauthbearer_set_token_failure").CreateDelegate(typeof(Func<IntPtr, string, ErrorCode>));
             _conf_set_default_topic_conf = (Action<IntPtr, IntPtr>)methods.Single(m => m.Name == "rd_kafka_conf_set_default_topic_conf").CreateDelegate(typeof(Action<IntPtr, IntPtr>));
             _conf_get = (ConfGet)methods.Single(m => m.Name == "rd_kafka_conf_get").CreateDelegate(typeof(ConfGet));
             _topic_conf_get = (ConfGet)methods.Single(m => m.Name == "rd_kafka_topic_conf_get").CreateDelegate(typeof(ConfGet));
@@ -180,6 +183,15 @@ namespace Confluent.Kafka.Impl
             _topic_conf_set = (Func<IntPtr, string, string, StringBuilder, UIntPtr, ConfRes>)methods.Single(m => m.Name == "rd_kafka_topic_conf_set").CreateDelegate(typeof(Func<IntPtr, string, string, StringBuilder, UIntPtr, ConfRes>));
             _topic_conf_set_partitioner_cb = (Action<IntPtr, PartitionerDelegate>)methods.Single(m => m.Name == "rd_kafka_topic_conf_set_partitioner_cb").CreateDelegate(typeof(Action<IntPtr, PartitionerDelegate>));
             _topic_partition_available = (Func<IntPtr, int, bool>)methods.Single(m => m.Name == "rd_kafka_topic_partition_available").CreateDelegate(typeof(Func<IntPtr, int, bool>));
+            _init_transactions = (Func<IntPtr, IntPtr, IntPtr>)methods.Single(m => m.Name == "rd_kafka_init_transactions").CreateDelegate(typeof(Func<IntPtr, IntPtr, IntPtr>));
+            _begin_transaction = (Func<IntPtr, IntPtr>)methods.Single(m => m.Name == "rd_kafka_begin_transaction").CreateDelegate(typeof(Func<IntPtr, IntPtr>));
+            _commit_transaction = (Func<IntPtr, IntPtr, IntPtr>)methods.Single(m => m.Name == "rd_kafka_commit_transaction").CreateDelegate(typeof(Func<IntPtr, IntPtr, IntPtr>));
+            _abort_transaction = (Func<IntPtr, IntPtr, IntPtr>)methods.Single(m => m.Name == "rd_kafka_abort_transaction").CreateDelegate(typeof(Func<IntPtr, IntPtr, IntPtr>));
+            _send_offsets_to_transaction = (Func<IntPtr, IntPtr, IntPtr, IntPtr, IntPtr>)methods.Single(m => m.Name == "rd_kafka_send_offsets_to_transaction").CreateDelegate(typeof(Func<IntPtr, IntPtr, IntPtr, IntPtr, IntPtr>));
+            _rd_kafka_consumer_group_metadata = (Func<IntPtr, IntPtr>)methods.Single(m => m.Name == "rd_kafka_consumer_group_metadata").CreateDelegate(typeof(Func<IntPtr, IntPtr>));
+            _rd_kafka_consumer_group_metadata_destroy = (Action<IntPtr>)methods.Single(m => m.Name == "rd_kafka_consumer_group_metadata_destroy").CreateDelegate(typeof(Action<IntPtr>));
+            _rd_kafka_consumer_group_metadata_write = (ConsumerGroupMetadataWriteDelegate)methods.Single(m => m.Name == "rd_kafka_consumer_group_metadata_write").CreateDelegate(typeof(ConsumerGroupMetadataWriteDelegate));
+            _rd_kafka_consumer_group_metadata_read = (ConsumerGroupMetadataReadDelegate)methods.Single(m => m.Name == "rd_kafka_consumer_group_metadata_read").CreateDelegate(typeof(ConsumerGroupMetadataReadDelegate));
             _new = (Func<RdKafkaType, IntPtr, StringBuilder, UIntPtr, SafeKafkaHandle>)methods.Single(m => m.Name == "rd_kafka_new").CreateDelegate(typeof(Func<RdKafkaType, IntPtr, StringBuilder, UIntPtr, SafeKafkaHandle>));
             _name = (Func<IntPtr, IntPtr>)methods.Single(m => m.Name == "rd_kafka_name").CreateDelegate(typeof(Func<IntPtr, IntPtr>));
             _memberid = (Func<IntPtr, IntPtr>)methods.Single(m => m.Name == "rd_kafka_memberid").CreateDelegate(typeof(Func<IntPtr, IntPtr>));
@@ -292,6 +304,13 @@ namespace Confluent.Kafka.Impl
 
             _destroy = (Action<IntPtr>)methods.Single(m => m.Name == "rd_kafka_destroy").CreateDelegate(typeof(Action<IntPtr>));
             _destroy_flags = (Action<IntPtr, IntPtr>)methods.Single(m => m.Name == "rd_kafka_destroy_flags").CreateDelegate(typeof(Action<IntPtr, IntPtr>));
+
+            _error_code = (Func<IntPtr, ErrorCode>)methods.Single(m => m.Name == "rd_kafka_error_code").CreateDelegate(typeof(Func<IntPtr, ErrorCode>));
+            _error_string = (Func<IntPtr, IntPtr>)methods.Single(m => m.Name == "rd_kafka_error_string").CreateDelegate(typeof(Func<IntPtr, IntPtr>));
+            _error_is_fatal = (Func<IntPtr, IntPtr>)methods.Single(m => m.Name == "rd_kafka_error_is_fatal").CreateDelegate(typeof(Func<IntPtr, IntPtr>));
+            _error_is_retriable = (Func<IntPtr, IntPtr>)methods.Single(m => m.Name == "rd_kafka_error_is_retriable").CreateDelegate(typeof(Func<IntPtr, IntPtr>));
+            _error_txn_requires_abort = (Func<IntPtr, IntPtr>)methods.Single(m => m.Name == "rd_kafka_error_txn_requires_abort").CreateDelegate(typeof(Func<IntPtr, IntPtr>));
+            _error_destroy = (Action<IntPtr>)methods.Single(m => m.Name == "rd_kafka_error_destroy").CreateDelegate(typeof(Action<IntPtr>));
 
             try
             {
@@ -502,6 +521,9 @@ namespace Confluent.Kafka.Impl
         internal delegate int StatsDelegate(IntPtr rk, IntPtr json, UIntPtr json_len, IntPtr opaque);
 
         [UnmanagedFunctionPointer(callingConvention: CallingConvention.Cdecl)]
+        internal delegate void OAuthBearerTokenRefreshDelegate(IntPtr rk, IntPtr oauthbearer_config, IntPtr opaque);
+
+        [UnmanagedFunctionPointer(callingConvention: CallingConvention.Cdecl)]
         internal delegate int PartitionerDelegate(
             /* const rd_kafka_topic_t * */ IntPtr rkt,
             IntPtr keydata,
@@ -626,6 +648,20 @@ namespace Confluent.Kafka.Impl
         internal static void conf_set_stats_cb(IntPtr conf, StatsDelegate stats_cb)
             => _conf_set_stats_cb(conf, stats_cb);
 
+        private static Action<IntPtr, OAuthBearerTokenRefreshDelegate> _conf_set_oauthbearer_token_refresh_cb;
+        internal static void conf_set_oauthbearer_token_refresh_cb(IntPtr conf, OAuthBearerTokenRefreshDelegate oauthbearer_token_refresh_cb)
+            => _conf_set_oauthbearer_token_refresh_cb(conf, oauthbearer_token_refresh_cb);
+
+        private static Func<IntPtr, string, long, string, string[], UIntPtr, StringBuilder, UIntPtr, ErrorCode> _oauthbearer_set_token;
+        internal static ErrorCode oauthbearer_set_token(IntPtr rk,
+            string token_value, long md_lifetime_ms, string md_principal_name, string[] extensions, UIntPtr extensions_size,
+            StringBuilder errstr, UIntPtr errstr_size)
+            => _oauthbearer_set_token(rk, token_value, md_lifetime_ms, md_principal_name, extensions, extensions_size, errstr, errstr_size);
+
+        private static Func<IntPtr, string, ErrorCode> _oauthbearer_set_token_failure;
+        internal static ErrorCode oauthbearer_set_token_failure(IntPtr rk, string errstr)
+            => _oauthbearer_set_token_failure(rk, errstr);
+
         private static Action<IntPtr, IntPtr> _conf_set_default_topic_conf;
         internal static void conf_set_default_topic_conf(IntPtr conf, IntPtr tconf)
             => _conf_set_default_topic_conf(conf, tconf);
@@ -677,6 +713,46 @@ namespace Confluent.Kafka.Impl
         private static Func<IntPtr, int, bool> _topic_partition_available;
         internal static bool topic_partition_available(IntPtr rkt, int partition)
             => _topic_partition_available(rkt, partition);
+
+        private static Func<IntPtr, IntPtr, IntPtr> _init_transactions;
+        internal static IntPtr init_transactions(IntPtr rk, IntPtr timeout)
+            => _init_transactions(rk, timeout);
+
+        private static Func<IntPtr, IntPtr> _begin_transaction;
+        internal static IntPtr begin_transaction(IntPtr rk)
+            => _begin_transaction(rk);
+
+        private static Func<IntPtr, IntPtr, IntPtr> _commit_transaction;
+        internal static IntPtr commit_transaction(IntPtr rk, IntPtr timeout)
+            => _commit_transaction(rk, timeout);
+
+        private static Func<IntPtr, IntPtr, IntPtr> _abort_transaction;
+        internal static IntPtr abort_transaction(IntPtr rk, IntPtr timeout)
+            => _abort_transaction(rk, timeout);
+
+        private static Func<IntPtr, IntPtr, IntPtr, IntPtr, IntPtr> _send_offsets_to_transaction;
+        internal static IntPtr send_offsets_to_transaction(IntPtr rk, IntPtr offsets, IntPtr consumer_group_metadata, IntPtr timeout_ms)
+            => _send_offsets_to_transaction(rk, offsets, consumer_group_metadata, timeout_ms);
+
+        private static Func<IntPtr, IntPtr> _rd_kafka_consumer_group_metadata;
+        internal static IntPtr consumer_group_metadata(IntPtr rk)
+            => _rd_kafka_consumer_group_metadata(rk);
+
+        private static Action<IntPtr> _rd_kafka_consumer_group_metadata_destroy;
+        internal static void consumer_group_metadata_destroy(IntPtr rk)
+            => _rd_kafka_consumer_group_metadata_destroy(rk);
+
+        [UnmanagedFunctionPointer(callingConvention: CallingConvention.Cdecl)]
+        private delegate IntPtr ConsumerGroupMetadataWriteDelegate(IntPtr cgmd, out IntPtr data, out IntPtr dataSize);
+        private static ConsumerGroupMetadataWriteDelegate _rd_kafka_consumer_group_metadata_write;
+        internal static IntPtr consumer_group_metadata_write(IntPtr cgmd, out IntPtr data, out IntPtr dataSize)
+            => _rd_kafka_consumer_group_metadata_write(cgmd, out data, out dataSize);
+
+        [UnmanagedFunctionPointer(callingConvention: CallingConvention.Cdecl)]
+        private delegate IntPtr ConsumerGroupMetadataReadDelegate(out IntPtr cgmd, byte[] data, IntPtr dataSize);
+        private static ConsumerGroupMetadataReadDelegate _rd_kafka_consumer_group_metadata_read;
+        internal static IntPtr consumer_group_metadata_read(out IntPtr cgmd, byte[] data, IntPtr dataSize)
+            => _rd_kafka_consumer_group_metadata_read(out cgmd, data, dataSize);
 
         private static Func<RdKafkaType, IntPtr, StringBuilder, UIntPtr, SafeKafkaHandle> _new;
         internal static SafeKafkaHandle kafka_new(RdKafkaType type, IntPtr conf,
@@ -1214,5 +1290,34 @@ namespace Confluent.Kafka.Impl
         private static Func<IntPtr, IntPtr> _event_topic_partition_list;
         internal static IntPtr event_topic_partition_list(IntPtr rkev)
             => _event_topic_partition_list(rkev);
+
+
+        //
+        // error_t
+        //
+
+        private static Func<IntPtr, ErrorCode> _error_code;
+        internal static ErrorCode error_code(IntPtr error)
+            => _error_code(error);
+
+        private static Func<IntPtr, IntPtr> _error_string;
+        internal static string error_string(IntPtr error)
+            => Util.Marshal.PtrToStringUTF8(_error_string(error));
+
+        private static Func<IntPtr, IntPtr> _error_is_fatal;
+        internal static bool error_is_fatal(IntPtr error)
+            => _error_is_fatal(error) != IntPtr.Zero;
+
+        private static Func<IntPtr, IntPtr> _error_is_retriable;
+        internal static bool error_is_retriable(IntPtr error)
+            => _error_is_retriable(error) != IntPtr.Zero;
+
+        private static Func<IntPtr, IntPtr> _error_txn_requires_abort;
+        internal static bool error_txn_requires_abort(IntPtr error)
+            => _error_txn_requires_abort(error) != IntPtr.Zero;
+
+        private static Action<IntPtr> _error_destroy;
+        internal static void error_destroy(IntPtr error)
+            => _error_destroy(error);
     }
 }

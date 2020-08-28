@@ -17,11 +17,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Runtime.InteropServices;
-using System.Threading;
-using System.Threading.Tasks;
-using Confluent.Kafka.Impl;
-using Confluent.Kafka.Internal;
 
 
 namespace Confluent.Kafka
@@ -52,6 +47,11 @@ namespace Confluent.Kafka
         internal protected Action<IConsumer<TKey, TValue>, string> StatisticsHandler { get; set; }
 
         /// <summary>
+        ///     The configured OAuthBearer Token Refresh handler.
+        /// </summary>
+        internal protected Action<IConsumer<TKey, TValue>, string> OAuthBearerTokenRefreshHandler { get; set; }
+
+        /// <summary>
         ///     The configured key deserializer.
         /// </summary>
         internal protected IDeserializer<TKey> KeyDeserializer { get; set; }
@@ -78,7 +78,7 @@ namespace Confluent.Kafka
 
         internal Consumer<TKey,TValue>.Config ConstructBaseConfig(Consumer<TKey, TValue> consumer)
         {
-            return new Consumer<TKey,TValue>.Config
+            return new Consumer<TKey, TValue>.Config
             {
                 config = Config,
                 errorHandler = this.ErrorHandler == null
@@ -93,6 +93,9 @@ namespace Confluent.Kafka
                 offsetsCommittedHandler = this.OffsetsCommittedHandler == null
                     ? default(Action<CommittedOffsets>)
                     : offsets => this.OffsetsCommittedHandler(consumer, offsets),
+                oAuthBearerTokenRefreshHandler = this.OAuthBearerTokenRefreshHandler == null
+                    ? default(Action<string>)
+                    : oAuthBearerConfig => this.OAuthBearerTokenRefreshHandler(consumer, oAuthBearerConfig),
                 partitionsAssignedHandler = this.PartitionsAssignedHandler == null
                     ? default(Func<List<TopicPartition>, IEnumerable<TopicPartitionOffset>>)
                     : partitions => this.PartitionsAssignedHandler(consumer, partitions),
@@ -125,10 +128,16 @@ namespace Confluent.Kafka
         /// </summary>
         /// <remarks>
         ///     You can enable statistics and set the statistics interval
-        ///     using the statistics.interval.ms configuration parameter
+        ///     using the StatisticsIntervalMs configuration property
         ///     (disabled by default).
         ///
-        ///     Executes as a side-effect of the Consume method (on the same thread).
+        ///     Executes as a side-effect of the Consume method (on the same
+        ///     thread).
+        ///
+        ///     Exceptions: Any exception thrown by your statistics handler
+        ///     will be wrapped in a ConsumeException with ErrorCode
+        ///     ErrorCode.Local_Application and thrown by the initiating call
+        ///     to Consume.
         /// </remarks>
         public ConsumerBuilder<TKey, TValue> SetStatisticsHandler(
             Action<IConsumer<TKey, TValue>, string> statisticsHandler)
@@ -149,6 +158,9 @@ namespace Confluent.Kafka
         /// </summary>
         /// <remarks>
         ///     Executes as a side-effect of the Consume method (on the same thread).
+        ///
+        ///     Exceptions: Any exception thrown by your error handler will be silently
+        ///     ignored.
         /// </remarks>
         public ConsumerBuilder<TKey, TValue> SetErrorHandler(
             Action<IConsumer<TKey, TValue>, Error> errorHandler)
@@ -170,12 +182,15 @@ namespace Confluent.Kafka
         ///     By default not many log messages are generated.
         ///
         ///     For more verbose logging, specify one or more debug contexts
-        ///     using the 'debug' configuration property.
+        ///     using the 'Debug' configuration property.
         ///
         ///     Warning: Log handlers are called spontaneously from internal
         ///     librdkafka threads and the application must not call any
         ///     Confluent.Kafka APIs from within a log handler or perform any
         ///     prolonged operations.
+        ///
+        ///     Exceptions: Any exception thrown by your log handler will be
+        ///     silently ignored.
         /// </remarks>
         public ConsumerBuilder<TKey, TValue> SetLogHandler(
             Action<IConsumer<TKey, TValue>, LogMessage> logHandler)
@@ -189,8 +204,47 @@ namespace Confluent.Kafka
         }
 
         /// <summary>
+        ///     Set SASL/OAUTHBEARER token refresh callback in provided
+        ///     conf object. The SASL/OAUTHBEARER token refresh callback
+        ///     is triggered via <see cref="IConsumer{TKey,TValue}.Consume(int)"/>
+        ///     (or any of its overloads) whenever OAUTHBEARER is the SASL
+        ///     mechanism and a token needs to be retrieved, typically
+        ///     based on the configuration defined in
+        ///     sasl.oauthbearer.config. The callback should invoke
+        ///     <see cref="ClientExtensions.OAuthBearerSetToken"/>
+        ///     or <see cref="ClientExtensions.OAuthBearerSetTokenFailure"/>
+        ///     to indicate success or failure, respectively.
+        ///
+        ///     An unsecured JWT refresh handler is provided by librdkafka
+        ///     for development and testing purposes, it is enabled by
+        ///     setting the enable.sasl.oauthbearer.unsecure.jwt property
+        ///     to true and is mutually exclusive to using a refresh callback.
+        /// </summary>
+        /// <param name="oAuthBearerTokenRefreshHandler">
+        ///     the callback to set; callback function arguments:
+        ///     IConsumer - instance of the consumer which should be used to
+        ///     set token or token failure string - Value of configuration
+        ///     property sasl.oauthbearer.config
+        /// </param>
+        public ConsumerBuilder<TKey, TValue> SetOAuthBearerTokenRefreshHandler(Action<IConsumer<TKey, TValue>, string> oAuthBearerTokenRefreshHandler)
+        {
+            if (this.OAuthBearerTokenRefreshHandler != null)
+            {
+                throw new InvalidOperationException("OAuthBearer token refresh handler may not be specified more than once.");
+            }
+            this.OAuthBearerTokenRefreshHandler = oAuthBearerTokenRefreshHandler;
+            return this;
+        }
+
+        /// <summary>
         ///     Set the deserializer to use to deserialize keys.
         /// </summary>
+        /// <remarks>
+        ///     If your key deserializer throws an exception, this will be
+        ///     wrapped in a ConsumeException with ErrorCode
+        ///     Local_KeyDeserialization and thrown by the initiating call to
+        ///     Consume.
+        /// </remarks>
         public ConsumerBuilder<TKey, TValue> SetKeyDeserializer(IDeserializer<TKey> deserializer)
         {
             if (this.KeyDeserializer != null)
@@ -204,6 +258,12 @@ namespace Confluent.Kafka
         /// <summary>
         ///     Set the deserializer to use to deserialize values.
         /// </summary>
+        /// <remarks>
+        ///     If your value deserializer throws an exception, this will be
+        ///     wrapped in a ConsumeException with ErrorCode
+        ///     Local_ValueDeserialization and thrown by the initiating call to
+        ///     Consume.
+        /// </remarks>
         public ConsumerBuilder<TKey, TValue> SetValueDeserializer(IDeserializer<TValue> deserializer)
         {
             if (this.ValueDeserializer != null)
@@ -232,6 +292,10 @@ namespace Confluent.Kafka
         ///     May execute as a side-effect of the Consumer.Consume call (on the same thread).
         ///     
         ///     Assign/Unassign must not be called in the handler.
+        ///
+        ///     Exceptions: Any exception thrown by your partitions assigned handler
+        ///     will be wrapped in a ConsumeException with ErrorCode
+        ///     ErrorCode.Local_Application and thrown by the initiating call to Consume.
         /// </remarks>
         public ConsumerBuilder<TKey, TValue> SetPartitionsAssignedHandler(
             Func<IConsumer<TKey, TValue>, List<TopicPartition>, IEnumerable<TopicPartitionOffset>> partitionsAssignedHandler)
@@ -260,6 +324,10 @@ namespace Confluent.Kafka
         ///     May execute as a side-effect of the Consumer.Consume call (on the same thread).
         ///     
         ///     Assign/Unassign must not be called in the handler.
+        ///
+        ///     Exceptions: Any exception thrown by your partitions assigned handler
+        ///     will be wrapped in a ConsumeException with ErrorCode
+        ///     ErrorCode.Local_Application and thrown by the initiating call to Consume.
         /// </remarks>
         public ConsumerBuilder<TKey, TValue> SetPartitionsAssignedHandler(
             Action<IConsumer<TKey, TValue>, List<TopicPartition>> partitionAssignmentHandler)
@@ -289,6 +357,10 @@ namespace Confluent.Kafka
         ///     May execute as a side-effect of the Consumer.Consume call (on the same thread).
         ///     
         ///     Assign/Unassign must not be called in the handler.
+        ///
+        ///     Exceptions: Any exception thrown by your partitions revoked handler
+        ///     will be wrapped in a ConsumeException with ErrorCode
+        ///     ErrorCode.Local_Application and thrown by the initiating call to Consume/Close.
         /// </remarks>
         public ConsumerBuilder<TKey, TValue> SetPartitionsRevokedHandler(
             Func<IConsumer<TKey, TValue>, List<TopicPartitionOffset>, IEnumerable<TopicPartitionOffset>> partitionsRevokedHandler)
@@ -317,6 +389,10 @@ namespace Confluent.Kafka
         ///     May execute as a side-effect of the Consumer.Consume call (on the same thread).
         ///     
         ///     Assign/Unassign must not be called in the handler.
+        ///
+        ///     Exceptions: Any exception thrown by your partitions revoked handler
+        ///     will be wrapped in a ConsumeException with ErrorCode
+        ///     ErrorCode.Local_Application and thrown by the initiating call to Consume.
         /// </remarks>
         public ConsumerBuilder<TKey, TValue> SetPartitionsRevokedHandler(
             Action<IConsumer<TKey, TValue>, List<TopicPartitionOffset>> partitionsRevokedHandler)
@@ -341,6 +417,10 @@ namespace Confluent.Kafka
         /// </summary>
         /// <remarks>
         ///     Executes as a side-effect of the Consumer.Consume call (on the same thread).
+        ///
+        ///     Exceptions: Any exception thrown by your offsets committed handler
+        ///     will be wrapped in a ConsumeException with ErrorCode
+        ///     ErrorCode.Local_Application and thrown by the initiating call to Consume/Close.
         /// </remarks>
         public ConsumerBuilder<TKey, TValue> SetOffsetsCommittedHandler(Action<IConsumer<TKey, TValue>, CommittedOffsets> offsetsCommittedHandler)
         {
