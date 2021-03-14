@@ -1,3 +1,44 @@
+# 1.6.2
+
+## Enhancements
+
+- References librdkafka.redist 1.6.1. Refer to the [1.6.0](https://github.com/edenhill/librdkafka/releases/tag/v1.6.0) and [1.6.1](https://github.com/edenhill/librdkafka/releases/tag/v1.6.1) release notes for more information. Headline features:
+  - KIP-429: Incremental rebalancing.
+  - KIP-447: Producer scalability for exactly once semantics.
+  - KIP-480: Sticky partitioner.
+- KIP-22: Support for custom partitioners.
+- Confluent.Kafka can now be used with Mono on Linux and MacOS. **Note**: Mono is not a supported runtime.
+- The debian9-librdkafka.so build of librdkafka has been replaced with a more portable one: centos6-librdkafka.so (note: Debian 9 is still supported).
+- Exceptions thrown by `Producer.Produce` now include an inner exception with additional context on the error ([joostas](https://github.com/joostas)).
+- Added `ConfigureAwait(false)` to async methods in the Avro Serdes.
+- Added `IsInvalid` property to `Handle` class ([volgunin](https://github.com/volgunin)).
+
+## Fixes
+
+- Fixed race condition in `ProtobufSerializer` ([yurii-hunter](https://github.com/yurii-hunter)).
+
+
+# 1.6.0, 1.6.1
+
+Version 1.6.0 and 1.6.1 were not released.
+
+
+# 1.5.3
+
+## Enhancements
+
+- References librdkafka 1.5.3. Refer to the [release notes](https://github.com/edenhill/librdkafka/releases/tag/v1.5.3) for more information.
+- References Apache.Avro v1.10.1, which adds support for enum defaults [AVRO-2750](https://issues.apache.org/jira/browse/AVRO-2750).
+
+
+# 1.5.2
+
+## Enhancements
+
+- References librdkafka 1.5.2. Refer to the [release notes](https://github.com/edenhill/librdkafka/releases/tag/v1.5.2) for more information.
+- Avro serializer now supports generic parameter `ISpecificRecord`. In this case, data is serialized according to the per-message concrete type (@[ni-mi](https://github.com/ni-mi)).
+
+
 # 1.5.1
 
 ## Enhancements
